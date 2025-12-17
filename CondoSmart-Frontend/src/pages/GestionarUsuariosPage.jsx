@@ -1,137 +1,276 @@
-import React, { useState } from 'react';
-import { FiArrowLeft, FiPlus, FiTrash2, FiEdit2 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import PageHeader from '../components/common/PageHeader';
+import Button from '../components/common/Button';
+import Table from '../components/common/Table';
+import Modal from '../components/common/Modal';
+import FormGroup from '../components/common/FormGroup';
+import Alert from '../components/common/Alert';
+import Input from '../components/common/Input';
+import Select from '../components/common/Select';
+import { userService } from '../services/userService';
 
 const GestionarUsuariosPage = () => {
-  const navigate = useNavigate();
-  const [usuarios, setUsuarios] = useState([
-    { id: 1, username: 'alejandro', email: 'ale@gmail.com', nombre: 'Alejandro', rol: 'admin', activo: true },
-    { id: 2, username: 'albaro', email: 'albaro@example.com', nombre: 'Álvaro', rol: 'usuario', activo: true },
-  ]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ username: '', email: '', nombre: '', rol: 'usuario' });
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    first_name: '',
+    last_name: '',
+    role: 'residente',
+    password: '',
+  });
 
-  const handleAddUser = () => {
-    if (form.username && form.email && form.nombre) {
-      setUsuarios([...usuarios, { id: usuarios.length + 1, ...form, activo: true }]);
-      setForm({ username: '', email: '', nombre: '', rol: 'usuario' });
-      setShowModal(false);
+  const roleOptions = [
+    { value: 'admin', label: 'Administrador' },
+    { value: 'propietario', label: 'Propietario' },
+    { value: 'residente', label: 'Residente' },
+    { value: 'inquilino', label: 'Inquilino' },
+    { value: 'vigilancia', label: 'Vigilancia' },
+  ];
+
+  useEffect(() => {
+    loadUsuarios();
+  }, []);
+
+  const loadUsuarios = async () => {
+    try {
+      setLoading(true);
+      const response = await userService.list();
+      setUsuarios(response.data.results || response.data);
+    } catch (err) {
+      setError('Error al cargar usuarios');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteUser = (id) => {
-    setUsuarios(usuarios.filter(u => u.id !== id));
+  const handleOpenModal = (usuario = null) => {
+    if (usuario) {
+      setEditingId(usuario.id);
+      setFormData({
+        username: usuario.username,
+        email: usuario.email,
+        first_name: usuario.first_name,
+        last_name: usuario.last_name,
+        role: usuario.role,
+        password: '',
+      });
+    } else {
+      setEditingId(null);
+      setFormData({
+        username: '',
+        email: '',
+        first_name: '',
+        last_name: '',
+        role: 'residente',
+        password: '',
+      });
+    }
+    setShowModal(true);
   };
 
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-200 rounded-lg">
-            <FiArrowLeft size={20} />
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingId(null);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const dataToSend = { ...formData };
+      if (editingId && !dataToSend.password) {
+        delete dataToSend.password;
+      }
+
+      if (editingId) {
+        await userService.update(editingId, dataToSend);
+        setSuccess('Usuario actualizado correctamente');
+      } else {
+        await userService.create(dataToSend);
+        setSuccess('Usuario creado correctamente');
+      }
+      handleCloseModal();
+      loadUsuarios();
+    } catch (err) {
+      setError('Error al guardar usuario');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Estás seguro?')) return;
+    try {
+      await userService.delete(id);
+      setSuccess('Usuario eliminado correctamente');
+      loadUsuarios();
+    } catch (err) {
+      setError('Error al eliminar usuario');
+    }
+  };
+
+  const columns = [
+    {
+      key: 'username',
+      label: 'Usuario',
+      render: (value) => <span className="font-semibold">{value}</span>,
+    },
+    {
+      key: 'first_name',
+      label: 'Nombre',
+      render: (value, row) => `${value} ${row.last_name}`,
+    },
+    {
+      key: 'email',
+      label: 'Email',
+    },
+    {
+      key: 'role',
+      label: 'Rol',
+      render: (value) => (
+        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+          {value}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Acciones',
+      render: (_, row) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleOpenModal(row)}
+            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+          >
+            <FiEdit2 size={18} />
           </button>
-          <h1 className="text-3xl font-bold text-gray-800">Gestionar Usuarios</h1>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="p-1 text-red-600 hover:bg-red-50 rounded"
+          >
+            <FiTrash2 size={18} />
+          </button>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <FiPlus /> Nuevo Usuario
-        </button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-8 space-y-6">
+      <PageHeader
+        title="Gestionar Usuarios"
+        subtitle="Administra los usuarios del sistema"
+        action={
+          <Button
+            variant="primary"
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2"
+          >
+            <FiPlus size={20} />
+            Nuevo Usuario
+          </Button>
+        }
+      />
+
+      {error && <Alert type="error" title="Error" message={error} />}
+      {success && <Alert type="success" title="Éxito" message={success} />}
+
+      <div className="bg-white rounded-lg shadow-sm">
+        <Table
+          columns={columns}
+          data={usuarios}
+          loading={loading}
+          emptyMessage="No hay usuarios registrados"
+        />
       </div>
 
-      {/* Tabla de Usuarios */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Usuario</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nombre</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Rol</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {usuarios.map(usuario => (
-              <tr key={usuario.id} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-3 text-sm text-gray-800">{usuario.username}</td>
-                <td className="px-6 py-3 text-sm text-gray-800">{usuario.email}</td>
-                <td className="px-6 py-3 text-sm text-gray-800">{usuario.nombre}</td>
-                <td className="px-6 py-3 text-sm">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${usuario.rol === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
-                    {usuario.rol}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-sm">
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {usuario.activo ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-center">
-                  <div className="flex justify-center gap-2">
-                    <button className="p-2 hover:bg-blue-100 rounded-lg text-blue-600">
-                      <FiEdit2 size={18} />
-                    </button>
-                    <button onClick={() => handleDeleteUser(usuario.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600">
-                      <FiTrash2 size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Modal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? 'Editar Usuario' : 'Nuevo Usuario'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <FormGroup label="Nombre de Usuario" required>
+            <Input
+              name="username"
+              value={formData.username}
+              onChange={handleInputChange}
+              placeholder="usuario123"
+            />
+          </FormGroup>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-4">Nuevo Usuario</h2>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Usuario"
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+          <FormGroup label="Email" required>
+            <Input
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              placeholder="usuario@ejemplo.com"
+            />
+          </FormGroup>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Nombre" required>
+              <Input
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleInputChange}
+                placeholder="Juan"
               />
-              <input
-                type="email"
-                placeholder="Email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+            </FormGroup>
+
+            <FormGroup label="Apellido" required>
+              <Input
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleInputChange}
+                placeholder="Pérez"
               />
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <select
-                value={form.rol}
-                onChange={(e) => setForm({ ...form, rol: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="usuario">Usuario</option>
-                <option value="admin">Administrador</option>
-              </select>
-              <div className="flex gap-3 pt-4">
-                <button onClick={handleAddUser} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                  Guardar
-                </button>
-                <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400">
-                  Cancelar
-                </button>
-              </div>
-            </div>
+            </FormGroup>
           </div>
-        </div>
-      )}
+
+          <FormGroup label="Rol" required>
+            <Select
+              name="role"
+              value={formData.role}
+              onChange={handleInputChange}
+              options={roleOptions}
+            />
+          </FormGroup>
+
+          <FormGroup label={editingId ? "Contraseña (dejar vacío para no cambiar)" : "Contraseña"} required={!editingId}>
+            <Input
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder="••••••••"
+            />
+          </FormGroup>
+
+          <div className="flex gap-3 pt-4">
+            <Button variant="secondary" onClick={handleCloseModal}>
+              Cancelar
+            </Button>
+            <Button variant="primary" type="submit" loading={loading}>
+              {editingId ? 'Actualizar' : 'Crear'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

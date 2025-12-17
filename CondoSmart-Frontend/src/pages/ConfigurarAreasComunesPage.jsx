@@ -1,132 +1,283 @@
-import React, { useState } from 'react';
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import PageHeader from '../components/common/PageHeader';
+import Button from '../components/common/Button';
+import Table from '../components/common/Table';
+import Modal from '../components/common/Modal';
+import FormGroup from '../components/common/FormGroup';
+import Alert from '../components/common/Alert';
+import Input from '../components/common/Input';
+import { areaService } from '../services/reservationService';
 
 const ConfigurarAreasComunesPage = () => {
-  const navigate = useNavigate();
-  const [areas, setAreas] = useState([
-    { id: 1, nombre: 'Salón de Eventos', capacidad: 50, precio: 100, horarioApertura: '08:00', horarioCierre: '23:00' },
-    { id: 2, nombre: 'Cancha de Tenis', capacidad: 4, precio: 30, horarioApertura: '06:00', horarioCierre: '22:00' },
-    { id: 3, nombre: 'Piscina', capacidad: 30, precio: 50, horarioApertura: '07:00', horarioCierre: '20:00' },
-  ]);
+  const [areas, setAreas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ nombre: '', capacidad: '', precio: '', horarioApertura: '', horarioCierre: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    descripcion: '',
+    capacidad: '',
+    precio_por_hora: '',
+    horario_apertura: '',
+    horario_cierre: '',
+    deposit_amount: '',
+  });
 
-  const handleAdd = () => {
-    if (form.nombre && form.capacidad && form.precio) {
-      setAreas([...areas, { id: areas.length + 1, ...form }]);
-      setForm({ nombre: '', capacidad: '', precio: '', horarioApertura: '', horarioCierre: '' });
-      setShowModal(false);
+  useEffect(() => {
+    loadAreas();
+  }, []);
+
+  const loadAreas = async () => {
+    try {
+      setLoading(true);
+      const response = await areaService.list();
+      setAreas(response.data.results || response.data);
+    } catch (err) {
+      setError('Error al cargar áreas comunes');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = (id) => {
-    setAreas(areas.filter(a => a.id !== id));
+  const handleOpenModal = (area = null) => {
+    if (area) {
+      setEditingId(area.id);
+      setFormData({
+        name: area.name,
+        descripcion: area.descripcion,
+        capacidad: area.capacidad,
+        precio_por_hora: area.precio_por_hora,
+        horario_apertura: area.horario_apertura,
+        horario_cierre: area.horario_cierre,
+        deposit_amount: area.deposit_amount,
+      });
+    } else {
+      setEditingId(null);
+      setFormData({
+        name: '',
+        descripcion: '',
+        capacidad: '',
+        precio_por_hora: '',
+        horario_apertura: '',
+        horario_cierre: '',
+        deposit_amount: '',
+      });
+    }
+    setShowModal(true);
   };
 
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-200 rounded-lg">
-            <FiArrowLeft size={20} />
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingId(null);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      if (editingId) {
+        await areaService.update(editingId, formData);
+        setSuccess('Área actualizada correctamente');
+      } else {
+        await areaService.create(formData);
+        setSuccess('Área creada correctamente');
+      }
+      handleCloseModal();
+      loadAreas();
+    } catch (err) {
+      setError('Error al guardar área');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Estás seguro?')) return;
+    try {
+      await areaService.delete(id);
+      setSuccess('Área eliminada correctamente');
+      loadAreas();
+    } catch (err) {
+      setError('Error al eliminar área');
+    }
+  };
+
+  const columns = [
+    {
+      key: 'name',
+      label: 'Nombre',
+      render: (value) => <span className="font-semibold">{value}</span>,
+    },
+    {
+      key: 'capacidad',
+      label: 'Capacidad',
+      render: (value) => `${value} personas`,
+    },
+    {
+      key: 'precio_por_hora',
+      label: 'Precio/Hora',
+      render: (value) => `$${parseFloat(value).toFixed(2)}`,
+    },
+    {
+      key: 'horario_apertura',
+      label: 'Horario',
+      render: (value, row) => `${value} - ${row.horario_cierre}`,
+    },
+    {
+      key: 'deposit_amount',
+      label: 'Depósito',
+      render: (value) => `$${parseFloat(value).toFixed(2)}`,
+    },
+    {
+      key: 'actions',
+      label: 'Acciones',
+      render: (_, row) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleOpenModal(row)}
+            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+          >
+            <FiEdit2 size={18} />
           </button>
-          <h1 className="text-3xl font-bold text-gray-800">Configurar Áreas Comunes</h1>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="p-1 text-red-600 hover:bg-red-50 rounded"
+          >
+            <FiTrash2 size={18} />
+          </button>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <FiPlus /> Nueva Área
-        </button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-8 space-y-6">
+      <PageHeader
+        title="Configurar Áreas Comunes"
+        subtitle="Gestiona las áreas comunes del condominio"
+        action={
+          <Button
+            variant="primary"
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2"
+          >
+            <FiPlus size={20} />
+            Nueva Área
+          </Button>
+        }
+      />
+
+      {error && <Alert type="error" title="Error" message={error} />}
+      {success && <Alert type="success" title="Éxito" message={success} />}
+
+      <div className="bg-white rounded-lg shadow-sm">
+        <Table
+          columns={columns}
+          data={areas}
+          loading={loading}
+          emptyMessage="No hay áreas comunes configuradas"
+        />
       </div>
 
-      {/* Tabla de Áreas */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Área</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Capacidad</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Precio/Hora</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Horario</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {areas.map(area => (
-              <tr key={area.id} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-3 text-sm font-medium text-gray-800">{area.nombre}</td>
-                <td className="px-6 py-3 text-sm text-gray-800">{area.capacidad} personas</td>
-                <td className="px-6 py-3 text-sm text-gray-800">${area.precio}</td>
-                <td className="px-6 py-3 text-sm text-gray-800">{area.horarioApertura} - {area.horarioCierre}</td>
-                <td className="px-6 py-3 text-center">
-                  <div className="flex justify-center gap-2">
-                    <button className="p-2 hover:bg-blue-100 rounded-lg text-blue-600">
-                      <FiEdit2 size={18} />
-                    </button>
-                    <button onClick={() => handleDelete(area.id)} className="p-2 hover:bg-red-100 rounded-lg text-red-600">
-                      <FiTrash2 size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Modal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? 'Editar Área' : 'Nueva Área Común'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <FormGroup label="Nombre" required>
+            <Input
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Salón de Eventos"
+            />
+          </FormGroup>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-4">Nueva Área</h2>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Nombre del área"
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <input
+          <FormGroup label="Descripción">
+            <textarea
+              name="descripcion"
+              value={formData.descripcion}
+              onChange={handleInputChange}
+              placeholder="Descripción del área"
+              rows="3"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </FormGroup>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Capacidad" required>
+              <Input
+                name="capacidad"
                 type="number"
-                placeholder="Capacidad"
-                value={form.capacidad}
-                onChange={(e) => setForm({ ...form, capacidad: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                value={formData.capacidad}
+                onChange={handleInputChange}
+                placeholder="50"
               />
-              <input
+            </FormGroup>
+
+            <FormGroup label="Precio por Hora" required>
+              <Input
+                name="precio_por_hora"
                 type="number"
-                placeholder="Precio por hora"
-                value={form.precio}
-                onChange={(e) => setForm({ ...form, precio: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                step="0.01"
+                value={formData.precio_por_hora}
+                onChange={handleInputChange}
+                placeholder="100.00"
               />
-              <input
-                type="time"
-                value={form.horarioApertura}
-                onChange={(e) => setForm({ ...form, horarioApertura: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <input
-                type="time"
-                value={form.horarioCierre}
-                onChange={(e) => setForm({ ...form, horarioCierre: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <div className="flex gap-3 pt-4">
-                <button onClick={handleAdd} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-                  Guardar
-                </button>
-                <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg hover:bg-gray-400">
-                  Cancelar
-                </button>
-              </div>
-            </div>
+            </FormGroup>
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Horario Apertura" required>
+              <Input
+                name="horario_apertura"
+                type="time"
+                value={formData.horario_apertura}
+                onChange={handleInputChange}
+              />
+            </FormGroup>
+
+            <FormGroup label="Horario Cierre" required>
+              <Input
+                name="horario_cierre"
+                type="time"
+                value={formData.horario_cierre}
+                onChange={handleInputChange}
+              />
+            </FormGroup>
+          </div>
+
+          <FormGroup label="Monto de Depósito" required>
+            <Input
+              name="deposit_amount"
+              type="number"
+              step="0.01"
+              value={formData.deposit_amount}
+              onChange={handleInputChange}
+              placeholder="500.00"
+            />
+          </FormGroup>
+
+          <div className="flex gap-3 pt-4">
+            <Button variant="secondary" onClick={handleCloseModal}>
+              Cancelar
+            </Button>
+            <Button variant="primary" type="submit" loading={loading}>
+              {editingId ? 'Actualizar' : 'Crear'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

@@ -1,29 +1,17 @@
-import React, { useState } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiCalendar } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import PageHeader from '../../components/common/PageHeader';
 import Button from '../../components/common/Button';
-import Input from '../../components/common/Input';
+import Table from '../../components/common/Table';
 import Modal from '../../components/common/Modal';
 import FormGroup from '../../components/common/FormGroup';
 import Alert from '../../components/common/Alert';
+import Input from '../../components/common/Input';
 import Select from '../../components/common/Select';
+import { reservaService } from '../../services/reservationService';
 
 const ReservasPage = () => {
-  const [reservas, setReservas] = useState([
-    {
-      id: 1,
-      area: 'Salón de Eventos',
-      usuario: 'Carlos López',
-      unidad: '301',
-      fecha_inicio: '2025-12-20',
-      fecha_fin: '2025-12-20',
-      hora_inicio: '18:00',
-      hora_fin: '23:00',
-      motivo: 'Cumpleaños',
-      estado: 'confirmada',
-      deposito: 500,
-    },
-  ]);
+  const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -31,44 +19,54 @@ const ReservasPage = () => {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     area: '',
-    usuario: '',
     unidad: '',
-    fecha_inicio: '',
-    hora_inicio: '',
-    hora_fin: '',
-    motivo: '',
+    start: '',
+    end: '',
+    status: 'pendiente',
   });
 
-  const areaOptions = [
-    { value: 'salon', label: 'Salón de Eventos' },
-    { value: 'cancha', label: 'Cancha Deportiva' },
-    { value: 'piscina', label: 'Piscina' },
-    { value: 'parque', label: 'Parque Infantil' },
-    { value: 'gym', label: 'Gimnasio' },
+  const statusOptions = [
+    { value: 'pendiente', label: 'Pendiente' },
+    { value: 'confirmada', label: 'Confirmada' },
+    { value: 'en_curso', label: 'En Curso' },
+    { value: 'completada', label: 'Completada' },
+    { value: 'cancelada', label: 'Cancelada' },
   ];
+
+  useEffect(() => {
+    loadReservas();
+  }, []);
+
+  const loadReservas = async () => {
+    try {
+      setLoading(true);
+      const response = await reservaService.list();
+      setReservas(response.data.results || response.data);
+    } catch (err) {
+      setError('Error al cargar reservas');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (reserva = null) => {
     if (reserva) {
       setEditingId(reserva.id);
       setFormData({
         area: reserva.area,
-        usuario: reserva.usuario,
         unidad: reserva.unidad,
-        fecha_inicio: reserva.fecha_inicio,
-        hora_inicio: reserva.hora_inicio,
-        hora_fin: reserva.hora_fin,
-        motivo: reserva.motivo,
+        start: reserva.start,
+        end: reserva.end,
+        status: reserva.status,
       });
     } else {
       setEditingId(null);
       setFormData({
         area: '',
-        usuario: '',
         unidad: '',
-        fecha_inicio: '',
-        hora_inicio: '',
-        hora_fin: '',
-        motivo: '',
+        start: '',
+        end: '',
+        status: 'pendiente',
       });
     }
     setShowModal(true);
@@ -81,10 +79,7 @@ const ReservasPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e) => {
@@ -92,53 +87,93 @@ const ReservasPage = () => {
     try {
       setLoading(true);
       if (editingId) {
-        setReservas(
-          reservas.map((r) =>
-            r.id === editingId
-              ? { ...r, ...formData, estado: 'confirmada' }
-              : r
-          )
-        );
+        await reservaService.update(editingId, formData);
         setSuccess('Reserva actualizada correctamente');
       } else {
-        const newReserva = {
-          id: Math.max(...reservas.map((r) => r.id), 0) + 1,
-          ...formData,
-          estado: 'confirmada',
-          deposito: 0,
-        };
-        setReservas([...reservas, newReserva]);
+        await reservaService.create(formData);
         setSuccess('Reserva creada correctamente');
       }
       handleCloseModal();
+      loadReservas();
     } catch (err) {
-      setError('Error al guardar reserva: ' + err.message);
+      setError('Error al guardar reserva');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('¿Estás seguro?')) {
-      setReservas(reservas.filter((r) => r.id !== id));
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Estás seguro?')) return;
+    try {
+      await reservaService.delete(id);
       setSuccess('Reserva eliminada correctamente');
+      loadReservas();
+    } catch (err) {
+      setError('Error al eliminar reserva');
     }
   };
 
-  const handleCancelar = (id) => {
-    if (window.confirm('¿Cancelar esta reserva?')) {
-      setReservas(
-        reservas.map((r) => (r.id === id ? { ...r, estado: 'cancelada' } : r))
-      );
-      setSuccess('Reserva cancelada correctamente');
-    }
-  };
+  const columns = [
+    {
+      key: 'area',
+      label: 'Área',
+      render: (value) => <span className="font-semibold">{value?.name || value}</span>,
+    },
+    {
+      key: 'unidad',
+      label: 'Unidad',
+      render: (value) => value?.code || value,
+    },
+    {
+      key: 'start',
+      label: 'Inicio',
+      render: (value) => new Date(value).toLocaleString(),
+    },
+    {
+      key: 'end',
+      label: 'Fin',
+      render: (value) => new Date(value).toLocaleString(),
+    },
+    {
+      key: 'status',
+      label: 'Estado',
+      render: (value) => (
+        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${value === 'confirmada' ? 'bg-green-100 text-green-800' :
+            value === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+              value === 'cancelada' ? 'bg-red-100 text-red-800' :
+                'bg-blue-100 text-blue-800'
+          }`}>
+          {value}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Acciones',
+      render: (_, row) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleOpenModal(row)}
+            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+          >
+            <FiEdit2 size={18} />
+          </button>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="p-1 text-red-600 hover:bg-red-50 rounded"
+          >
+            <FiTrash2 size={18} />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="p-8 space-y-6">
       <PageHeader
-        title="Realizar Reservas"
-        subtitle="Gestiona las reservas de áreas comunes"
+        title="Reservas de Áreas Comunes"
+        subtitle="Gestiona las reservas de espacios comunes"
         action={
           <Button
             variant="primary"
@@ -154,123 +189,13 @@ const ReservasPage = () => {
       {error && <Alert type="error" title="Error" message={error} />}
       {success && <Alert type="success" title="Éxito" message={success} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="text-gray-600 text-sm mb-2">Reservas Confirmadas</p>
-          <p className="text-3xl font-bold text-green-600">
-            {reservas.filter((r) => r.estado === 'confirmada').length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="text-gray-600 text-sm mb-2">Próximas 7 Días</p>
-          <p className="text-3xl font-bold text-blue-600">
-            {reservas.filter((r) => {
-              const fecha = new Date(r.fecha_inicio);
-              const hoy = new Date();
-              const proximos = new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000);
-              return fecha >= hoy && fecha <= proximos;
-            }).length}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="text-gray-600 text-sm mb-2">Depósitos Recaudados</p>
-          <p className="text-3xl font-bold text-purple-600">
-            ${reservas.reduce((sum, r) => sum + r.deposito, 0).toFixed(2)}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="text-gray-600 text-sm mb-2">Áreas Disponibles</p>
-          <p className="text-3xl font-bold text-gray-600">{areaOptions.length}</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">Próximas Reservas</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Área
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Usuario
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Horario
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Motivo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {reservas.map((reserva) => (
-                <tr key={reserva.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-semibold">
-                    {reserva.area}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {reserva.usuario} (U{reserva.unidad})
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {new Date(reserva.fecha_inicio).toLocaleDateString('es-ES')}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {reserva.hora_inicio} - {reserva.hora_fin}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {reserva.motivo}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                        reserva.estado === 'confirmada'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {reserva.estado}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 flex gap-2 justify-center">
-                    <button
-                      onClick={() => handleOpenModal(reserva)}
-                      className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                    >
-                      <FiEdit2 size={18} />
-                    </button>
-                    {reserva.estado === 'confirmada' && (
-                      <button
-                        onClick={() => handleCancelar(reserva.id)}
-                        className="p-1 text-yellow-600 hover:bg-yellow-50 rounded"
-                      >
-                        ✕
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(reserva.id)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <FiTrash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="bg-white rounded-lg shadow-sm">
+        <Table
+          columns={columns}
+          data={reservas}
+          loading={loading}
+          emptyMessage="No hay reservas registradas"
+        />
       </div>
 
       <Modal
@@ -280,67 +205,50 @@ const ReservasPage = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormGroup label="Área Común" required>
-            <Select
+          <FormGroup label="ID de Área" required>
+            <Input
               name="area"
+              type="number"
               value={formData.area}
               onChange={handleInputChange}
-              options={areaOptions}
+              placeholder="ID del área común"
             />
           </FormGroup>
 
-          <FormGroup label="Usuario" required>
-            <Input
-              name="usuario"
-              value={formData.usuario}
-              onChange={handleInputChange}
-              placeholder="Nombre del usuario"
-            />
-          </FormGroup>
-
-          <FormGroup label="Unidad" required>
+          <FormGroup label="ID de Unidad" required>
             <Input
               name="unidad"
+              type="number"
               value={formData.unidad}
               onChange={handleInputChange}
-              placeholder="Número de unidad"
+              placeholder="ID de la unidad"
             />
           </FormGroup>
 
-          <FormGroup label="Fecha" required>
+          <FormGroup label="Fecha y Hora de Inicio" required>
             <Input
-              name="fecha_inicio"
-              type="date"
-              value={formData.fecha_inicio}
+              name="start"
+              type="datetime-local"
+              value={formData.start}
               onChange={handleInputChange}
             />
           </FormGroup>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Hora Inicio" required>
-              <Input
-                name="hora_inicio"
-                type="time"
-                value={formData.hora_inicio}
-                onChange={handleInputChange}
-              />
-            </FormGroup>
-            <FormGroup label="Hora Fin" required>
-              <Input
-                name="hora_fin"
-                type="time"
-                value={formData.hora_fin}
-                onChange={handleInputChange}
-              />
-            </FormGroup>
-          </div>
-
-          <FormGroup label="Motivo" required>
+          <FormGroup label="Fecha y Hora de Fin" required>
             <Input
-              name="motivo"
-              value={formData.motivo}
+              name="end"
+              type="datetime-local"
+              value={formData.end}
               onChange={handleInputChange}
-              placeholder="Evento, reunión, etc."
+            />
+          </FormGroup>
+
+          <FormGroup label="Estado" required>
+            <Select
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+              options={statusOptions}
             />
           </FormGroup>
 
@@ -349,7 +257,7 @@ const ReservasPage = () => {
               Cancelar
             </Button>
             <Button variant="primary" type="submit" loading={loading}>
-              {editingId ? 'Actualizar' : 'Reservar'}
+              {editingId ? 'Actualizar' : 'Crear'}
             </Button>
           </div>
         </form>

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: condosmart-backend
+    runtime: python
+    rootDir: CondoSmart-Backend
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    startCommand: "gunicorn config.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: DB_ENGINE
+        value: django.db.backends.postgresql
+      - key: DB_NAME
+        value: postgres
+      - key: DB_USER
+        value: postgres
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        value: db.dzoyxmdoeztjputvqkij.supabase.co
+      - key: DB_PORT
+        value: 5432

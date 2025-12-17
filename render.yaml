@@ -3,7 +3,7 @@ services:
     name: condosmart-backend
     runtime: python
     rootDir: CondoSmart-Backend
-    buildCommand: "chmod +x build.sh && ./build.sh"
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate"
     startCommand: "gunicorn config.wsgi:application"
     envVars:
       - key: PYTHON_VERSION
@@ -24,3 +24,5 @@ services:
         value: db.dzoyxmdoeztjputvqkij.supabase.co
       - key: DB_PORT
         value: 5432
+      - key: ALLOWED_HOSTS
+        value: .onrender.com

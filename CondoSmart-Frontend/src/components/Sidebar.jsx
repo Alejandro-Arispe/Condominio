@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { FiChevronDown, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
+import {
+  FiChevronDown, FiLogOut, FiMenu, FiX, FiLock, FiHome,
+  FiCalendar, FiDollarSign, FiMessageSquare, FiTool,
+  FiBarChart2, FiShield
+} from 'react-icons/fi';
 import { useAuth } from '../utils/hooks';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,7 +16,8 @@ const Sidebar = () => {
   const packages = [
     {
       id: 'auth',
-      name: '🔐 Autenticación y Acceso',
+      name: 'Autenticación y Acceso',
+      icon: FiLock,
       items: [
         { id: 'login', name: 'Iniciar Sesión', path: '/login' },
         { id: 'users', name: 'Gestionar Usuarios', path: '/usuarios' },
@@ -21,7 +26,8 @@ const Sidebar = () => {
     },
     {
       id: 'housing',
-      name: '🏠 Vivienda',
+      name: 'Vivienda',
+      icon: FiHome,
       items: [
         { id: 'units', name: 'Administrar Unidades', path: '/unidades' },
         { id: 'residents', name: 'Ocupantes', path: '/ocupantes' },
@@ -32,17 +38,21 @@ const Sidebar = () => {
     },
     {
       id: 'security',
-      name: '🔒 Seguridad',
+      name: 'Seguridad',
+      icon: FiShield,
       items: [
         { id: 'accesses', name: 'Gestionar Accesos y Visitas', path: '/accesos' },
-        { id: 'facial-recognition', name: 'Reconocimiento Facial/Placas', path: '/reconocimiento' },
+        { id: 'facial-recognition', name: 'Reconocimiento Facial', path: '/reconocimiento' },
+        { id: 'plate-recognition', name: 'Reconocimiento de Placas (OCR)', path: '/reconocimiento-placas' },
+        { id: 'anomaly-detection', name: 'Detección de Anomalías', path: '/deteccion-anomalias' },
         { id: 'alerts', name: 'Alertas e Incidentes', path: '/incidentes' },
         { id: 'access-history', name: 'Historial de Accesos', path: '/historial-accesos' },
       ],
     },
     {
       id: 'reservations',
-      name: '📅 Reservas',
+      name: 'Reservas',
+      icon: FiCalendar,
       items: [
         { id: 'areas', name: 'Configurar Áreas Comunes', path: '/areas-comunes' },
         { id: 'booking', name: 'Realizar Reservas', path: '/reservas' },
@@ -52,7 +62,8 @@ const Sidebar = () => {
     },
     {
       id: 'finance',
-      name: '💰 Finanzas',
+      name: 'Finanzas',
+      icon: FiDollarSign,
       items: [
         { id: 'expenses-config', name: 'Configurar Expensas', path: '/configurar-expensas' },
         { id: 'generate-expenses', name: 'Generar Expensas', path: '/generar-expensas' },
@@ -63,7 +74,8 @@ const Sidebar = () => {
     },
     {
       id: 'communication',
-      name: '📢 Comunicación',
+      name: 'Comunicación',
+      icon: FiMessageSquare,
       items: [
         { id: 'broadcast', name: 'Enviar Comunicados', path: '/comunicados' },
         { id: 'read-report', name: 'Reporte de Lectura', path: '/reporte-lectura' },
@@ -71,7 +83,8 @@ const Sidebar = () => {
     },
     {
       id: 'services',
-      name: '🔧 Servicios y Mantenimiento',
+      name: 'Servicios y Mantenimiento',
+      icon: FiTool,
       items: [
         { id: 'program-services', name: 'Programar Servicios', path: '/programar-servicios' },
         { id: 'register-execution', name: 'Registrar Ejecución', path: '/registrar-ejecucion' },
@@ -80,10 +93,13 @@ const Sidebar = () => {
     },
     {
       id: 'reports',
-      name: '📊 Reportes y Analítica',
+      name: 'Reportes y Analítica',
+      icon: FiBarChart2,
       items: [
         { id: 'generate-reports', name: 'Generar Reportes', path: '/reportes' },
         { id: 'analytics', name: 'Analítica Visual', path: '/analitica' },
+        { id: 'predictive', name: 'Analítica Predictiva (IA)', path: '/analitica-predictiva' },
+        { id: 'payment-online', name: 'Pago en Línea', path: '/pago-en-linea' },
       ],
     },
   ];
@@ -130,11 +146,13 @@ const Sidebar = () => {
               onClick={() => toggleExpand(pkg.id)}
               className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-blue-50 transition text-left font-medium text-gray-800"
             >
-              <span className="text-sm">{pkg.name}</span>
+              <span className="text-sm flex items-center gap-2">
+                {pkg.icon && <pkg.icon size={18} className="text-blue-600" />}
+                {pkg.name}
+              </span>
               <FiChevronDown
-                className={`transition-transform ${
-                  expanded[pkg.id] ? 'rotate-180' : ''
-                }`}
+                className={`transition-transform ${expanded[pkg.id] ? 'rotate-180' : ''
+                  }`}
               />
             </button>
 

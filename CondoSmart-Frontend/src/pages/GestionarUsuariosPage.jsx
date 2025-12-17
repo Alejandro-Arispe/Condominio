@@ -23,7 +23,9 @@ const GestionarUsuariosPage = () => {
     first_name: '',
     last_name: '',
     role: 'residente',
+    phone: '',
     password: '',
+    password_confirm: '',
   });
 
   const roleOptions = [
@@ -59,7 +61,9 @@ const GestionarUsuariosPage = () => {
         first_name: usuario.first_name,
         last_name: usuario.last_name,
         role: usuario.role,
+        phone: usuario.phone || '',
         password: '',
+        password_confirm: '',
       });
     } else {
       setEditingId(null);
@@ -69,7 +73,9 @@ const GestionarUsuariosPage = () => {
         first_name: '',
         last_name: '',
         role: 'residente',
+        phone: '',
         password: '',
+        password_confirm: '',
       });
     }
     setShowModal(true);
@@ -90,8 +96,11 @@ const GestionarUsuariosPage = () => {
     try {
       setLoading(true);
       const dataToSend = { ...formData };
+
+      // Para edición, eliminar password si está vacío
       if (editingId && !dataToSend.password) {
         delete dataToSend.password;
+        delete dataToSend.password_confirm;
       }
 
       if (editingId) {
@@ -251,6 +260,15 @@ const GestionarUsuariosPage = () => {
             />
           </FormGroup>
 
+          <FormGroup label="Teléfono">
+            <Input
+              name="phone"
+              value={formData.phone}
+              onChange={handleInputChange}
+              placeholder="+591 12345678"
+            />
+          </FormGroup>
+
           <FormGroup label={editingId ? "Contraseña (dejar vacío para no cambiar)" : "Contraseña"} required={!editingId}>
             <Input
               name="password"
@@ -260,6 +278,18 @@ const GestionarUsuariosPage = () => {
               placeholder="••••••••"
             />
           </FormGroup>
+
+          {!editingId && (
+            <FormGroup label="Confirmar Contraseña" required>
+              <Input
+                name="password_confirm"
+                type="password"
+                value={formData.password_confirm}
+                onChange={handleInputChange}
+                placeholder="••••••••"
+              />
+            </FormGroup>
+          )}
 
           <div className="flex gap-3 pt-4">
             <Button variant="secondary" onClick={handleCloseModal}>

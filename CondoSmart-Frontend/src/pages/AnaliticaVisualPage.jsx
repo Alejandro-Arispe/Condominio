@@ -1,160 +1,140 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiArrowLeft, FiDownload, FiFilter } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import apiClient from '../services/apiClient';
+import Alert from '../components/common/Alert';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const AnaliticaVisualPage = () => {
   const navigate = useNavigate();
   const [periodo, setPeriodo] = useState('mes');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Datos de ejemplo
-  const datosGastos = [
-    { mes: 'Ene', expensas: 1200, servicios: 450, seguros: 300 },
-    { mes: 'Feb', expensas: 1300, servicios: 500, seguros: 300 },
-    { mes: 'Mar', expensas: 1250, servicios: 480, seguros: 300 },
-    { mes: 'Abr', expensas: 1400, servicios: 520, seguros: 300 },
-  ];
+  // Datos del backend
+  const [kpis, setKpis] = useState({
+    totalExpensas: 0,
+    ocupacionPromedio: 0,
+    accesosRegistrados: 0,
+    recaudacion: 0,
+  });
 
-  const datosOcupacion = [
-    { zona: 'Zona A', porcentaje: 95 },
-    { zona: 'Zona B', porcentaje: 88 },
-    { zona: 'Zona C', porcentaje: 92 },
-    { zona: 'Zona D', porcentaje: 85 },
-  ];
+  const [datosGastos, setDatosGastos] = useState([]);
+  const [datosOcupacion, setDatosOcupacion] = useState([]);
+  const [datosAccesos, setDatosAccesos] = useState([]);
+  const [distribucionGastos, setDistribucionGastos] = useState([]);
 
-  const datosAccesos = [
-    { dia: 'Lun', entradas: 245, salidas: 230 },
-    { dia: 'Mar', entradas: 289, salidas: 275 },
-    { dia: 'Mié', entradas: 256, salidas: 248 },
-    { dia: 'Jue', entradas: 312, salidas: 305 },
-    { dia: 'Vie', entradas: 350, salidas: 340 },
-    { dia: 'Sáb', entradas: 120, salidas: 115 },
-    { dia: 'Dom', entradas: 90, salidas: 88 },
-  ];
+  useEffect(() => {
+    cargarDatos();
+  }, [periodo]);
 
-  // Componente de gráfico de barras simple
-  const BarChart = ({ datos, dataKey, label, maxValue }) => {
-    const max = Math.max(...datos.map(d => d[dataKey]));
-    return (
-      <div className="space-y-3">
-        {datos.map(item => (
-          <div key={item.mes || item.zona || item.dia}>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-700 font-medium">{item.mes || item.zona || item.dia}</span>
-              <span className="text-gray-600">{item[dataKey]}</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full"
-                style={{ width: `${(item[dataKey] / max) * 100}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+  const cargarDatos = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // Cargar datos en paralelo
+      const [cargos, pagos, unidades, accesos] = await Promise.all([
+        apiClient.get('/cargos/'),
+        apiClient.get('/pagos/'),
+        apiClient.get('/unidades/'),
+        apiClient.get('/accesos/'),
+      ]);
+
+      // Calcular KPIs
+      const totalCargos = cargos.data.results?.reduce((sum, c) => sum + parseFloat(c.monto), 0) || 0;
+      const totalPagos = pagos.data.results?.reduce((sum, p) => sum + parseFloat(p.monto), 0) || 0;
+      const totalUnidades = unidades.data.results?.length || 0;
+      const ocupadas = unidades.data.results?.filter(u => u.user).length || 0;
+      const ocupacionPct = totalUnidades > 0 ? ((ocupadas / totalUnidades) * 100).toFixed(0) : 0;
+
+      setKpis({
+        totalExpensas: totalCargos,
+        ocupacionPromedio: ocupacionPct,
+        accesosRegistrados: accesos.data.results?.length || 0,
+        recaudacion: totalPagos,
+      });
+
+      // Preparar datos de gastos por concepto
+      const gastosPorConcepto = {};
+      cargos.data.results?.forEach(cargo => {
+        const concepto = cargo.concepto || 'Otros';
+        gastosPorConcepto[concepto] = (gastosPorConcepto[concepto] || 0) + parseFloat(cargo.monto);
+      });
+
+      const gastosArray = Object.entries(gastosPorConcepto).map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: parseFloat(value.toFixed(2)),
+      }));
+
+      setDistribucionGastos(gastosArray);
+
+      // Datos de ocupación por piso
+      const ocupacionPorPiso = {};
+      unidades.data.results?.forEach(unidad => {
+        const piso = unidad.piso || 1;
+        if (!ocupacionPorPiso[piso]) {
+          ocupacionPorPiso[piso] = { total: 0, ocupadas: 0 };
+        }
+        ocupacionPorPiso[piso].total++;
+        if (unidad.user) ocupacionPorPiso[piso].ocupadas++;
+      });
+
+      const ocupacionArray = Object.entries(ocupacionPorPiso).map(([piso, data]) => ({
+        piso: `Piso ${piso}`,
+        porcentaje: data.total > 0 ? ((data.ocupadas / data.total) * 100).toFixed(1) : 0,
+      }));
+
+      setDatosOcupacion(ocupacionArray);
+
+      // Datos de accesos por día (últimos 7 días)
+      const accesosArray = [
+        { dia: 'Lun', entradas: 0, salidas: 0 },
+        { dia: 'Mar', entradas: 0, salidas: 0 },
+        { dia: 'Mié', entradas: 0, salidas: 0 },
+        { dia: 'Jue', entradas: 0, salidas: 0 },
+        { dia: 'Vie', entradas: 0, salidas: 0 },
+        { dia: 'Sáb', entradas: 0, salidas: 0 },
+        { dia: 'Dom', entradas: 0, salidas: 0 },
+      ];
+
+      // Contar accesos por tipo
+      accesos.data.results?.forEach(acceso => {
+        const fecha = new Date(acceso.timestamp || acceso.created_at);
+        const diaSemana = fecha.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+        const diaIndex = diaSemana === 0 ? 6 : diaSemana - 1; // Ajustar para que Lun = 0
+
+        if (acceso.tipo === 'entrada') {
+          accesosArray[diaIndex].entradas++;
+        } else {
+          accesosArray[diaIndex].salidas++;
+        }
+      });
+
+      setDatosAccesos(accesosArray);
+
+      // Datos de gastos mensuales (simulado con datos actuales)
+      const gastosMensuales = [
+        { mes: 'Ene', monto: totalCargos * 0.8 },
+        { mes: 'Feb', monto: totalCargos * 0.9 },
+        { mes: 'Mar', monto: totalCargos * 0.95 },
+        { mes: 'Abr', monto: totalCargos },
+      ];
+
+      setDatosGastos(gastosMensuales);
+
+    } catch (err) {
+      setError('Error al cargar datos de analítica');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Gráfico de línea simple
-  const LineChart = ({ datos }) => {
-    const maxEntradas = Math.max(...datos.map(d => d.entradas));
-    const scale = 300 / maxEntradas;
-    
-    return (
-      <div className="relative h-64 bg-gradient-to-b from-gray-50 to-white rounded-lg p-4">
-        <svg className="w-full h-full" viewBox="0 0 700 250" preserveAspectRatio="xMidYMid meet">
-          {/* Grilla */}
-          {[0, 1, 2, 3, 4].map(i => (
-            <line key={`h-${i}`} x1="30" y1={50 + i * 40} x2="680" y2={50 + i * 40} stroke="#e5e7eb" strokeDasharray="5" />
-          ))}
-          
-          {/* Línea de Entradas */}
-          <polyline
-            points={datos.map((d, i) => `${50 + i * 90},${200 - d.entradas * scale}`).join(' ')}
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="3"
-          />
-          
-          {/* Línea de Salidas */}
-          <polyline
-            points={datos.map((d, i) => `${50 + i * 90},${200 - d.salidas * scale}`).join(' ')}
-            fill="none"
-            stroke="#ef4444"
-            strokeWidth="3"
-          />
-          
-          {/* Etiquetas X */}
-          {datos.map((d, i) => (
-            <text key={`x-${i}`} x={50 + i * 90} y="230" textAnchor="middle" fontSize="12" fill="#666">
-              {d.dia}
-            </text>
-          ))}
-          
-          {/* Etiquetas Y */}
-          {[0, 1, 2, 3, 4].map(i => (
-            <text key={`y-${i}`} x="20" y={55 + i * 40} textAnchor="end" fontSize="12" fill="#666">
-              {Math.round(maxEntradas * (4 - i) / 4)}
-            </text>
-          ))}
-        </svg>
-        <div className="flex justify-center gap-6 mt-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-            <span>Entradas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-            <span>Salidas</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Gráfico de pastel simple
-  const PieChart = ({ datos }) => {
-    const total = Object.values(datos).reduce((a, b) => a + b, 0);
-    const colores = ['#3b82f6', '#10b981', '#f59e0b'];
-    const labels = Object.keys(datos);
-    
-    let startAngle = 0;
-    const slices = labels.map((label, idx) => {
-      const valor = datos[label];
-      const sliceAngle = (valor / total) * 360;
-      const [x1, y1] = [
-        100 + 80 * Math.cos((startAngle * Math.PI) / 180),
-        100 + 80 * Math.sin((startAngle * Math.PI) / 180)
-      ];
-      const [x2, y2] = [
-        100 + 80 * Math.cos(((startAngle + sliceAngle) * Math.PI) / 180),
-        100 + 80 * Math.sin(((startAngle + sliceAngle) * Math.PI) / 180)
-      ];
-      
-      const largeArc = sliceAngle > 180 ? 1 : 0;
-      const path = `M 100 100 L ${x1} ${y1} A 80 80 0 ${largeArc} 1 ${x2} ${y2} Z`;
-      
-      startAngle += sliceAngle;
-      
-      return (
-        <path key={label} d={path} fill={colores[idx]} opacity="0.8" />
-      );
-    });
-    
-    return (
-      <div className="flex flex-col items-center">
-        <svg width="200" height="200" viewBox="0 0 200 200">
-          {slices}
-        </svg>
-        <div className="space-y-2 mt-4">
-          {labels.map((label, idx) => (
-            <div key={label} className="flex items-center gap-2 text-sm">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colores[idx] }}></div>
-              <span className="text-gray-700">{label}: ${datos[label]}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const handleExportar = () => {
+    alert('Funcionalidad de exportar en desarrollo');
   };
 
   return (
@@ -166,10 +146,15 @@ const AnaliticaVisualPage = () => {
           </button>
           <h1 className="text-3xl font-bold text-gray-800">Analítica Visual</h1>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+        <button
+          onClick={handleExportar}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+        >
           <FiDownload /> Exportar
         </button>
       </div>
+
+      {error && <Alert type="error" title="Error" message={error} />}
 
       {/* Selector de Período */}
       <div className="flex gap-2 mb-6">
@@ -177,11 +162,10 @@ const AnaliticaVisualPage = () => {
           <button
             key={p}
             onClick={() => setPeriodo(p)}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              periodo === p
+            className={`px-4 py-2 rounded-lg font-medium transition ${periodo === p
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+              }`}
           >
             {p.charAt(0).toUpperCase() + p.slice(1)}
           </button>
@@ -192,23 +176,23 @@ const AnaliticaVisualPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-blue-600">
           <p className="text-sm text-gray-600">Total Expensas</p>
-          <p className="text-3xl font-bold text-blue-700">$5,150</p>
-          <p className="text-xs text-gray-500 mt-1">+2.5% vs mes anterior</p>
+          <p className="text-3xl font-bold text-blue-700">${kpis.totalExpensas.toFixed(2)}</p>
+          <p className="text-xs text-gray-500 mt-1">Cargos generados</p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-green-600">
           <p className="text-sm text-gray-600">Ocupación Promedio</p>
-          <p className="text-3xl font-bold text-green-700">90%</p>
-          <p className="text-xs text-gray-500 mt-1">4 zonas monitoreadas</p>
+          <p className="text-3xl font-bold text-green-700">{kpis.ocupacionPromedio}%</p>
+          <p className="text-xs text-gray-500 mt-1">Unidades ocupadas</p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-purple-600">
           <p className="text-sm text-gray-600">Accesos Registrados</p>
-          <p className="text-3xl font-bold text-purple-700">1,852</p>
-          <p className="text-xs text-gray-500 mt-1">Esta semana</p>
+          <p className="text-3xl font-bold text-purple-700">{kpis.accesosRegistrados}</p>
+          <p className="text-xs text-gray-500 mt-1">Total registros</p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-orange-600">
           <p className="text-sm text-gray-600">Recaudación</p>
-          <p className="text-3xl font-bold text-orange-700">$51,500</p>
-          <p className="text-xs text-gray-500 mt-1">98% de cobranza</p>
+          <p className="text-3xl font-bold text-orange-700">${kpis.recaudacion.toFixed(2)}</p>
+          <p className="text-xs text-gray-500 mt-1">Pagos recibidos</p>
         </div>
       </div>
 
@@ -217,13 +201,31 @@ const AnaliticaVisualPage = () => {
         {/* Gráfico de Gastos */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Tendencia de Gastos</h2>
-          <BarChart datos={datosGastos} dataKey="expensas" label="Expensas" />
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={datosGastos}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="mes" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="monto" fill="#3b82f6" name="Monto" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Gráfico de Ocupación */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Ocupación por Zona</h2>
-          <BarChart datos={datosOcupacion} dataKey="porcentaje" label="Porcentaje" />
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Ocupación por Piso</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={datosOcupacion}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="piso" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="porcentaje" fill="#10b981" name="Ocupación %" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
@@ -231,13 +233,41 @@ const AnaliticaVisualPage = () => {
         {/* Gráfico de Línea de Accesos */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Movimiento Semanal</h2>
-          <LineChart datos={datosAccesos} />
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={datosAccesos}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="dia" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="entradas" stroke="#3b82f6" name="Entradas" />
+              <Line type="monotone" dataKey="salidas" stroke="#ef4444" name="Salidas" />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Gráfico de Pastel */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribución de Gastos</h2>
-          <PieChart datos={{ 'Expensas': 5200, 'Servicios': 1950, 'Seguros': 900 }} />
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={distribucionGastos}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {distribucionGastos.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

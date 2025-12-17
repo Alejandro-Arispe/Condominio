@@ -19,13 +19,13 @@ const OcupantesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    user: '',
-    unidad: '',
+    user_id: '',
+    unidad_id: '',
     tipo_ocupacion: 'propietario',
     status: 'activa',
     is_owner: false,
-    start: '',
-    end: '',
+    fecha_ingreso: '',
+    fecha_salida: '',
   });
 
   const tipoOcupacionOptions = [
@@ -63,17 +63,25 @@ const OcupantesPage = () => {
   const handleOpenModal = (ocupante = null) => {
     if (ocupante) {
       setEditingId(ocupante.id);
-      setFormData(ocupante);
+      setFormData({
+        user_id: ocupante.user?.id || '',
+        unidad_id: ocupante.unidad?.id || '',
+        tipo_ocupacion: ocupante.tipo_ocupacion,
+        status: ocupante.status,
+        is_owner: ocupante.is_owner,
+        fecha_ingreso: ocupante.fecha_ingreso || '',
+        fecha_salida: ocupante.fecha_salida || '',
+      });
     } else {
       setEditingId(null);
       setFormData({
-        user: '',
-        unidad: '',
+        user_id: '',
+        unidad_id: '',
         tipo_ocupacion: 'propietario',
         status: 'activa',
         is_owner: false,
-        start: '',
-        end: '',
+        fecha_ingreso: '',
+        fecha_salida: '',
       });
     }
     setShowModal(true);
@@ -160,11 +168,10 @@ const OcupantesPage = () => {
       label: 'Estado',
       render: (value) => (
         <span
-          className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-            value === 'activa'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
-          }`}
+          className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${value === 'activa'
+            ? 'bg-green-100 text-green-800'
+            : 'bg-gray-100 text-gray-800'
+            }`}
         >
           {value === 'activa' ? 'Activa' : 'Inactiva'}
         </span>
@@ -257,19 +264,21 @@ const OcupantesPage = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormGroup label="Usuario" required>
+          <FormGroup label="ID de Usuario" required>
             <Input
-              name="user"
-              value={formData.user}
+              name="user_id"
+              type="number"
+              value={formData.user_id}
               onChange={handleInputChange}
               placeholder="ID del usuario"
             />
           </FormGroup>
 
-          <FormGroup label="Unidad" required>
+          <FormGroup label="ID de Unidad" required>
             <Input
-              name="unidad"
-              value={formData.unidad}
+              name="unidad_id"
+              type="number"
+              value={formData.unidad_id}
               onChange={handleInputChange}
               placeholder="ID de la unidad"
             />
@@ -293,20 +302,20 @@ const OcupantesPage = () => {
             />
           </FormGroup>
 
-          <FormGroup label="Fecha de Inicio" required>
+          <FormGroup label="Fecha de Ingreso" required>
             <Input
-              name="start"
+              name="fecha_ingreso"
               type="date"
-              value={formData.start}
+              value={formData.fecha_ingreso}
               onChange={handleInputChange}
             />
           </FormGroup>
 
-          <FormGroup label="Fecha de Fin" required={false}>
+          <FormGroup label="Fecha de Salida" required={false}>
             <Input
-              name="end"
+              name="fecha_salida"
               type="date"
-              value={formData.end}
+              value={formData.fecha_salida}
               onChange={handleInputChange}
             />
           </FormGroup>

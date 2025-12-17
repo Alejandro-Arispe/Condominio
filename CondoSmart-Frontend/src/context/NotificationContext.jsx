@@ -40,42 +40,13 @@ export const NotificationProvider = ({ children }) => {
         setNotifications([]);
     };
 
-    // Simular notificaciones push periódicas
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const tiposNotificaciones = [
-                {
-                    type: 'info',
-                    title: 'Nuevo acceso registrado',
-                    message: 'Entrada autorizada en puerta principal',
-                },
-                {
-                    type: 'warning',
-                    title: 'Recordatorio de pago',
-                    message: 'Tu cuota mensual vence en 3 días',
-                },
-                {
-                    type: 'success',
-                    title: 'Pago recibido',
-                    message: 'Se ha confirmado tu pago de $150.00',
-                },
-                {
-                    type: 'error',
-                    title: 'Incidente detectado',
-                    message: 'Vehículo no autorizado detectado en zona de parqueo',
-                },
-            ];
-
-            const random = tiposNotificaciones[Math.floor(Math.random() * tiposNotificaciones.length)];
-
-            // Solo agregar si hay menos de 10 notificaciones
-            if (notifications.length < 10) {
-                addNotification(random);
-            }
-        }, 30000); // Cada 30 segundos
-
-        return () => clearInterval(interval);
-    }, [notifications.length]);
+    // Notificaciones push desactivadas - solo se mostrarán notificaciones manuales
+    // useEffect(() => {
+    //     const interval = setInterval(() => {
+    //         // Código comentado para desactivar notificaciones automáticas
+    //     }, 30000);
+    //     return () => clearInterval(interval);
+    // }, [notifications.length]);
 
     return (
         <NotificationContext.Provider value={{ notifications, addNotification, removeNotification, clearAll }}>

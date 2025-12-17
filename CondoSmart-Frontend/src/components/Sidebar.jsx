@@ -44,6 +44,7 @@ const Sidebar = () => {
         { id: 'accesses', name: 'Gestionar Accesos y Visitas', path: '/accesos' },
         { id: 'facial-recognition', name: 'Reconocimiento Facial', path: '/reconocimiento' },
         { id: 'plate-recognition', name: 'Reconocimiento de Placas (OCR)', path: '/reconocimiento-placas' },
+        { id: 'qr-reader', name: 'Lector QR (Control Acceso)', path: '/lector-qr' },
         { id: 'anomaly-detection', name: 'Detección de Anomalías', path: '/deteccion-anomalias' },
         { id: 'alerts', name: 'Alertas e Incidentes', path: '/incidentes' },
         { id: 'access-history', name: 'Historial de Accesos', path: '/historial-accesos' },

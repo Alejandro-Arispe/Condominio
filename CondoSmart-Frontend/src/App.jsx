@@ -37,6 +37,7 @@ import DeteccionAnomaliasPage from './pages/DeteccionAnomaliasPage';
 import AnaliticaPredictiva from './pages/AnaliticaPredictiva';
 import DashboardPage from './pages/DashboardPage';
 import PagoEnLineaPage from './pages/PagoEnLineaPage';
+import LectorQRPage from './pages/LectorQRPage';
 import ConfigurarAreasComunesPage from './pages/ConfigurarAreasComunesPage';
 import CicloVidaReservasPage from './pages/CicloVidaReservasPage';
 import GestionarDepositosPage from './pages/GestionarDepositosPage';
@@ -135,6 +136,14 @@ function App() {
                 element={
                   <MainLayout>
                     <ReconocimientoPlacasPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/lector-qr"
+                element={
+                  <MainLayout>
+                    <LectorQRPage />
                   </MainLayout>
                 }
               />

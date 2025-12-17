@@ -29,11 +29,11 @@ const ReconocimientoFacialPage = () => {
 
   const loadModels = async () => {
     try {
-      // Usar CDN de jsDelivr para cargar modelos automáticamente
-      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+      // Usar CDN de face-api.js
+      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 
       await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
@@ -100,38 +100,47 @@ const ReconocimientoFacialPage = () => {
 
     // Detectar rostros cada 100ms
     const interval = setInterval(async () => {
-      if (videoRef.current && canvasRef.current) {
-        const detections = await faceapi
-          .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceExpressions();
+      if (videoRef.current && canvasRef.current && videoRef.current.readyState === 4) {
+        try {
+          const detections = await faceapi
+            .detectAllFaces(videoRef.current, new faceapi.SsdMobilenetv1Options())
+            .withFaceLandmarks()
+            .withFaceDescriptors()
+            .withFaceExpressions();
 
-        // Limpiar canvas
-        const displaySize = {
-          width: videoRef.current.videoWidth,
-          height: videoRef.current.videoHeight
-        };
+          // Limpiar canvas
+          const displaySize = {
+            width: videoRef.current.videoWidth,
+            height: videoRef.current.videoHeight
+          };
 
-        faceapi.matchDimensions(canvasRef.current, displaySize);
-        const resizedDetections = faceapi.resizeResults(detections, displaySize);
-
-        canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
-        faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetections);
-        faceapi.draw.drawFaceExpressions(canvasRef.current, resizedDetections);
-
-        // Si se detecta un rostro, procesar
-        if (detections.length > 0) {
-          const detection = detections[0];
-          const confidence = Math.round(detection.detection.score * 100);
-
-          if (confidence > 80) {
-            // Rostro detectado con alta confianza
-            clearInterval(interval);
-            setDetectionInterval(null);
-
-            await processDetection(detection, confidence);
+          if (displaySize.width === 0 || displaySize.height === 0) {
+            return; // Video aún no está listo
           }
+
+          faceapi.matchDimensions(canvasRef.current, displaySize);
+          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+
+          canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
+          faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetections);
+          faceapi.draw.drawFaceExpressions(canvasRef.current, resizedDetections);
+
+          // Si se detecta un rostro, procesar
+          if (detections.length > 0) {
+            const detection = detections[0];
+            const confidence = Math.round(detection.detection.score * 100);
+
+            if (confidence > 80) {
+              // Rostro detectado con alta confianza
+              clearInterval(interval);
+              setDetectionInterval(null);
+
+              await processDetection(detection, confidence);
+            }
+          }
+        } catch (err) {
+          console.error('Error en detección:', err);
         }
       }
     }, 100);
@@ -158,36 +167,170 @@ const ReconocimientoFacialPage = () => {
       const photo = capturePhoto();
       setCapturedPhoto(photo);
 
-      // Obtener usuario autenticado
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      // Obtener descriptor facial de la persona detectada
+      const faceDescriptor = detection.descriptor;
 
-      const mockResult = {
-        user: currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'Usuario',
-        unit: currentUser?.username || 'N/A',
-        timestamp: new Date().toLocaleString(),
-        status: 'Acceso autorizado',
-        confidence: confidence,
-        expression: detection.expressions.asSortedArray()[0].expression,
-        photo: photo
-      };
+      // Cargar usuarios registrados con sus fotos
+      const registeredUsers = await loadRegisteredUsers();
 
-      // Registrar acceso
-      await accesoService.create({
-        tipo: 'facial',
-        sentido: 'in',
-        permitido: true,
-        confianza: confidence,
-      });
+      if (registeredUsers.length === 0) {
+        // MODO FALLBACK: Usar usuario actual como reconocido
+        const userStr = localStorage.getItem('user');
+        const currentUser = userStr ? JSON.parse(userStr) : null;
 
-      setResult(mockResult);
+        if (currentUser) {
+          // Registrar acceso del usuario actual
+          await accesoService.create({
+            tipo: 'facial',
+            sentido: 'in',
+            permitido: true,
+            confianza: confidence,
+            user: currentUser.id,
+          });
+
+          setResult({
+            user: `${currentUser.first_name} ${currentUser.last_name}`,
+            unit: currentUser.username,
+            timestamp: new Date().toLocaleString(),
+            status: 'Acceso autorizado (Demo)',
+            confidence: confidence,
+            expression: detection.expressions.asSortedArray()[0].expression,
+            photo: photo,
+            allowed: true
+          });
+        } else {
+          setResult({
+            user: 'Desconocido',
+            unit: 'N/A',
+            timestamp: new Date().toLocaleString(),
+            status: 'Acceso denegado - No hay usuarios registrados',
+            confidence: confidence,
+            expression: detection.expressions.asSortedArray()[0].expression,
+            photo: photo,
+            allowed: false
+          });
+        }
+
+        setScanning(false);
+        stopCamera();
+        loadAccesos();
+        return;
+      }
+
+      // Comparar con usuarios registrados
+      const match = await findBestMatch(faceDescriptor, registeredUsers);
+
+      if (match && match.distance < 0.6) {
+        // Match encontrado (distancia < 0.6 es buen match)
+        const matchConfidence = Math.round((1 - match.distance) * 100);
+
+        // Registrar acceso
+        await accesoService.create({
+          tipo: 'facial',
+          sentido: 'in',
+          permitido: true,
+          confianza: matchConfidence,
+          user: match.user.id,
+        });
+
+        setResult({
+          user: `${match.user.first_name} ${match.user.last_name}`,
+          unit: match.user.username,
+          timestamp: new Date().toLocaleString(),
+          status: 'Acceso autorizado',
+          confidence: matchConfidence,
+          expression: detection.expressions.asSortedArray()[0].expression,
+          photo: photo,
+          allowed: true
+        });
+      } else {
+        // No match - persona desconocida
+        await accesoService.create({
+          tipo: 'facial',
+          sentido: 'in',
+          permitido: false,
+          confianza: confidence,
+        });
+
+        setResult({
+          user: 'Desconocido',
+          unit: 'N/A',
+          timestamp: new Date().toLocaleString(),
+          status: 'Acceso denegado - Persona no reconocida',
+          confidence: confidence,
+          expression: detection.expressions.asSortedArray()[0].expression,
+          photo: photo,
+          allowed: false
+        });
+      }
+
       setScanning(false);
       stopCamera();
       loadAccesos();
     } catch (err) {
+      console.error('Error al procesar detección:', err);
       setError('Error al procesar detección');
       setScanning(false);
     }
+  };
+
+  const loadRegisteredUsers = async () => {
+    try {
+      // Cargar usuarios desde el backend usando el nuevo endpoint
+      const response = await fetch('/api/v1/usuarios/with-photos/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al cargar usuarios');
+      }
+
+      const users = await response.json();
+
+      console.log('Usuarios cargados:', users.length);
+      console.log('Usuarios con foto:', users.filter(u => u.photo_url).length);
+
+      // Ya vienen filtrados con foto
+      return users;
+    } catch (err) {
+      console.error('Error al cargar usuarios:', err);
+      return [];
+    }
+  };
+
+  const findBestMatch = async (faceDescriptor, registeredUsers) => {
+    let bestMatch = null;
+    let minDistance = 1.0;
+
+    for (const user of registeredUsers) {
+      try {
+        // Cargar foto del usuario
+        const img = await faceapi.fetchImage(user.photo_url);
+
+        // Detectar rostro en la foto registrada
+        const detection = await faceapi
+          .detectSingleFace(img, new faceapi.SsdMobilenetv1Options())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (detection) {
+          // Calcular distancia euclidiana
+          const distance = faceapi.euclideanDistance(faceDescriptor, detection.descriptor);
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestMatch = { user, distance };
+          }
+        }
+      } catch (err) {
+        console.error(`Error al procesar foto de ${user.username}:`, err);
+      }
+    }
+
+    return bestMatch;
   };
 
   const handleStopScan = () => {
@@ -290,9 +433,16 @@ const ReconocimientoFacialPage = () => {
                 </div>
               </>
             ) : (
-              <div className="space-y-4">
-                <FiCheckCircle size={80} className="text-green-600 mx-auto" />
-                <h3 className="text-2xl font-bold text-gray-900">{result.status}</h3>
+              <div className="text-center space-y-4">
+                {result.allowed ? (
+                  <FiCheckCircle size={80} className="text-green-600 mx-auto" />
+                ) : (
+                  <FiAlertCircle size={80} className="text-red-600 mx-auto" />
+                )}
+
+                <h3 className={`text-2xl font-bold ${result.allowed ? 'text-green-600' : 'text-red-600'}`}>
+                  {result.status}
+                </h3>
 
                 {/* Foto capturada */}
                 {result.photo && (
@@ -300,16 +450,23 @@ const ReconocimientoFacialPage = () => {
                     <img
                       src={result.photo}
                       alt="Foto capturada"
-                      className="w-48 h-48 object-cover rounded-lg border-4 border-green-500 shadow-lg"
+                      className={`w-48 h-48 object-cover rounded-lg border-4 ${result.allowed ? 'border-green-500' : 'border-red-500'
+                        } shadow-lg`}
                     />
                   </div>
                 )}
 
-                <div className="bg-gray-50 rounded-lg p-6 space-y-2 text-left">
+                <div className={`rounded-lg p-6 space-y-2 text-left ${result.allowed ? 'bg-green-50' : 'bg-red-50'
+                  }`}>
                   <p><strong>Usuario:</strong> {result.user}</p>
                   <p><strong>Unidad:</strong> {result.unit}</p>
                   <p><strong>Hora:</strong> {result.timestamp}</p>
-                  <p><strong>Confianza:</strong> <span className="text-green-600 font-bold">{result.confidence}%</span></p>
+                  <p>
+                    <strong>Confianza:</strong>{' '}
+                    <span className={`font-bold ${result.allowed ? 'text-green-600' : 'text-red-600'}`}>
+                      {result.confidence}%
+                    </span>
+                  </p>
                   <p><strong>Expresión:</strong> {result.expression}</p>
                 </div>
                 <Button

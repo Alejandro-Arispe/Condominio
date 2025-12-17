@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "CondoSmart - Sistema integral de gestión de condominios",
   "private": true,
+  "proxy": "http://localhost:8000",
   "dependencies": {
     "axios": "^1.6.2",
     "date-fns": "^2.30.0",

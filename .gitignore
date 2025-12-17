@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.env
+venv/
+ENV/
+.venv
+db.sqlite3
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Flutter/Dart - Solo incluir lib/ y archivos de config
+condominioSmartMovil/.dart_tool/
+condominioSmartMovil/.flutter-plugins
+condominioSmartMovil/.flutter-plugins-dependencies
+condominioSmartMovil/.packages
+condominioSmartMovil/.pub-cache/
+condominioSmartMovil/.pub/
+condominioSmartMovil/build/
+condominioSmartMovil/.metadata
+condominioSmartMovil/android/
+condominioSmartMovil/ios/
+condominioSmartMovil/linux/
+condominioSmartMovil/macos/
+condominioSmartMovil/windows/
+condominioSmartMovil/web/
+condominioSmartMovil/test/
+condominioSmartMovil/*.iml
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db

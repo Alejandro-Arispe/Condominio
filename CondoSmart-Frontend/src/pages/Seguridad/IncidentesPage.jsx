@@ -1,40 +1,35 @@
-import React, { useState } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import PageHeader from '../../components/common/PageHeader';
 import Button from '../../components/common/Button';
 import Table from '../../components/common/Table';
-import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
 import FormGroup from '../../components/common/FormGroup';
 import Alert from '../../components/common/Alert';
+import Input from '../../components/common/Input';
 import Select from '../../components/common/Select';
+import { incidenteService } from '../../services/securityService';
 
 const IncidentesPage = () => {
-  const [incidentes, setIncidentes] = useState([
-    {
-      id: 1,
-      titulo: 'Comportamiento sospechoso',
-      descripcion: 'Persona merodeando la entrada',
-      severidad: 'media',
-      ubicacion: 'Entrada principal',
-      fecha: '2025-12-15',
-      hora: '14:30',
-      reportado_por: 'Vigilancia',
-      estado: 'en_revision',
-    },
-  ]);
+  const [incidentes, setIncidentes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    titulo: '',
+    tipo: 'seguridad',
     descripcion: '',
-    severidad: 'media',
     ubicacion: '',
-    reportado_por: '',
+    severidad: 'media',
   });
+
+  const tipoOptions = [
+    { value: 'seguridad', label: 'Seguridad' },
+    { value: 'ruido', label: 'Ruido' },
+    { value: 'vandalismo', label: 'Vandalismo' },
+    { value: 'otro', label: 'Otro' },
+  ];
 
   const severidadOptions = [
     { value: 'baja', label: 'Baja' },
@@ -43,24 +38,38 @@ const IncidentesPage = () => {
     { value: 'critica', label: 'Crítica' },
   ];
 
-  const estadoOptions = [
-    { value: 'nuevo', label: 'Nuevo' },
-    { value: 'en_revision', label: 'En Revisión' },
-    { value: 'resuelto', label: 'Resuelto' },
-  ];
+  useEffect(() => {
+    loadIncidentes();
+  }, []);
+
+  const loadIncidentes = async () => {
+    try {
+      setLoading(true);
+      const response = await incidenteService.list();
+      setIncidentes(response.data.results || response.data);
+    } catch (err) {
+      setError('Error al cargar incidentes');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (incidente = null) => {
     if (incidente) {
       setEditingId(incidente.id);
-      setFormData(incidente);
+      setFormData({
+        tipo: incidente.tipo,
+        descripcion: incidente.descripcion,
+        ubicacion: incidente.ubicacion,
+        severidad: incidente.severidad,
+      });
     } else {
       setEditingId(null);
       setFormData({
-        titulo: '',
+        tipo: 'seguridad',
         descripcion: '',
-        severidad: 'media',
         ubicacion: '',
-        reportado_por: '',
+        severidad: 'media',
       });
     }
     setShowModal(true);
@@ -73,45 +82,37 @@ const IncidentesPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      const now = new Date();
       if (editingId) {
-        setIncidentes(
-          incidentes.map((i) => (i.id === editingId ? { ...i, ...formData } : i))
-        );
+        await incidenteService.update(editingId, formData);
         setSuccess('Incidente actualizado correctamente');
       } else {
-        const newIncidente = {
-          id: Math.max(...incidentes.map((i) => i.id), 0) + 1,
-          ...formData,
-          fecha: now.toISOString().split('T')[0],
-          hora: `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`,
-          estado: 'nuevo',
-        };
-        setIncidentes([...incidentes, newIncidente]);
+        await incidenteService.create(formData);
         setSuccess('Incidente registrado correctamente');
       }
       handleCloseModal();
+      loadIncidentes();
     } catch (err) {
-      setError('Error al guardar incidente: ' + err.message);
+      setError('Error al guardar incidente');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('¿Estás seguro?')) {
-      setIncidentes(incidentes.filter((i) => i.id !== id));
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Estás seguro?')) return;
+    try {
+      await incidenteService.delete(id);
       setSuccess('Incidente eliminado correctamente');
+      loadIncidentes();
+    } catch (err) {
+      setError('Error al eliminar incidente');
     }
   };
 
@@ -127,9 +128,18 @@ const IncidentesPage = () => {
 
   const columns = [
     {
-      key: 'titulo',
-      label: 'Título',
+      key: 'tipo',
+      label: 'Tipo',
       render: (value) => <span className="font-semibold">{value}</span>,
+    },
+    {
+      key: 'descripcion',
+      label: 'Descripción',
+      render: (value) => <span className="text-sm text-gray-600">{value?.substring(0, 50)}...</span>,
+    },
+    {
+      key: 'ubicacion',
+      label: 'Ubicación',
     },
     {
       key: 'severidad',
@@ -141,31 +151,16 @@ const IncidentesPage = () => {
       ),
     },
     {
-      key: 'ubicacion',
-      label: 'Ubicación',
-      render: (value) => <span className="text-sm text-gray-600">{value}</span>,
-    },
-    {
-      key: 'fecha',
-      label: 'Fecha',
-      render: (value, row) => (
-        <span className="text-sm">
-          {new Date(value).toLocaleDateString('es-ES')} {row.hora}
-        </span>
-      ),
-    },
-    {
       key: 'estado',
       label: 'Estado',
       render: (value) => (
         <span
-          className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-            value === 'resuelto'
+          className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${value === 'resuelto'
               ? 'bg-green-100 text-green-800'
               : value === 'en_revision'
-              ? 'bg-blue-100 text-blue-800'
-              : 'bg-red-100 text-red-800'
-          }`}
+                ? 'bg-blue-100 text-blue-800'
+                : 'bg-red-100 text-red-800'
+            }`}
         >
           {value}
         </span>
@@ -256,12 +251,12 @@ const IncidentesPage = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormGroup label="Título" required>
-            <Input
-              name="titulo"
-              value={formData.titulo}
+          <FormGroup label="Tipo" required>
+            <Select
+              name="tipo"
+              value={formData.tipo}
               onChange={handleInputChange}
-              placeholder="Descripción breve"
+              options={tipoOptions}
             />
           </FormGroup>
 
@@ -276,15 +271,6 @@ const IncidentesPage = () => {
             />
           </FormGroup>
 
-          <FormGroup label="Severidad" required>
-            <Select
-              name="severidad"
-              value={formData.severidad}
-              onChange={handleInputChange}
-              options={severidadOptions}
-            />
-          </FormGroup>
-
           <FormGroup label="Ubicación" required>
             <Input
               name="ubicacion"
@@ -294,12 +280,12 @@ const IncidentesPage = () => {
             />
           </FormGroup>
 
-          <FormGroup label="Reportado por" required>
-            <Input
-              name="reportado_por"
-              value={formData.reportado_por}
+          <FormGroup label="Severidad" required>
+            <Select
+              name="severidad"
+              value={formData.severidad}
               onChange={handleInputChange}
-              placeholder="Nombre de quien reporta"
+              options={severidadOptions}
             />
           </FormGroup>
 

@@ -9,6 +9,7 @@ psycopg2-binary==2.9.9
 # Autenticación & Seguridad
 djangorestframework-simplejwt==5.3.0
 PyJWT==2.8.0
+setuptools>=68.0.0
 
 #  Documentos 
 Pillow>=10.0.0

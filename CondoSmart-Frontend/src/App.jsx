@@ -41,6 +41,7 @@ import ProgramarServiciosPage from './pages/ProgramarServiciosPage';
 import RegistrarEjecucionPage from './pages/RegistrarEjecucionPage';
 import HistorialAccesosPage from './pages/HistorialAccesosPage';
 import AnaliticaVisualPage from './pages/AnaliticaVisualPage';
+import ReporteLecturaPage from './pages/ReporteLecturaPage';
 import './index.css';
 
 function App() {
@@ -62,7 +63,7 @@ function App() {
                 </MainLayout>
               }
             />
-            
+
             {/* Vivienda Module */}
             <Route
               path="/unidades"
@@ -283,6 +284,14 @@ function App() {
               element={
                 <MainLayout>
                   <GestionarUsuariosPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/reporte-lectura"
+              element={
+                <MainLayout>
+                  <ReporteLecturaPage />
                 </MainLayout>
               }
             />

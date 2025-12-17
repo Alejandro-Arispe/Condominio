@@ -23,58 +23,53 @@ axiosInstance.interceptors.request.use(
 
 // Servicios para Condominios
 export const condominioService = {
-  list: (params) => axiosInstance.get('/housing/condominios/', { params }),
-  get: (id) => axiosInstance.get(`/housing/condominios/${id}/`),
-  create: (data) => axiosInstance.post('/housing/condominios/', data),
-  update: (id, data) => axiosInstance.patch(`/housing/condominios/${id}/`, data),
-  delete: (id) => axiosInstance.delete(`/housing/condominios/${id}/`),
+  list: (params) => axiosInstance.get('/condominios/', { params }),
+  get: (id) => axiosInstance.get(`/condominios/${id}/`),
+  create: (data) => axiosInstance.post('/condominios/', data),
+  update: (id, data) => axiosInstance.patch(`/condominios/${id}/`, data),
+  delete: (id) => axiosInstance.delete(`/condominios/${id}/`),
 };
 
-// Servicios para Unidades
 export const unidadService = {
-  list: (params) => axiosInstance.get('/housing/unidades/', { params }),
-  get: (id) => axiosInstance.get(`/housing/unidades/${id}/`),
-  create: (data) => axiosInstance.post('/housing/unidades/', data),
-  update: (id, data) => axiosInstance.patch(`/housing/unidades/${id}/`, data),
-  delete: (id) => axiosInstance.delete(`/housing/unidades/${id}/`),
+  list: (params) => axiosInstance.get('/unidades/', { params }),
+  get: (id) => axiosInstance.get(`/unidades/${id}/`),
+  create: (data) => axiosInstance.post('/unidades/', data),
+  update: (id, data) => axiosInstance.patch(`/unidades/${id}/`, data),
+  delete: (id) => axiosInstance.delete(`/unidades/${id}/`),
 };
 
-// Servicios para Ocupantes (Residencias)
 export const residencyService = {
-  list: (params) => axiosInstance.get('/housing/residencias/', { params }),
-  get: (id) => axiosInstance.get(`/housing/residencias/${id}/`),
-  create: (data) => axiosInstance.post('/housing/residencias/', data),
-  update: (id, data) => axiosInstance.patch(`/housing/residencias/${id}/`, data),
-  delete: (id) => axiosInstance.delete(`/housing/residencias/${id}/`),
+  list: (params) => axiosInstance.get('/ocupantes/', { params }),
+  get: (id) => axiosInstance.get(`/ocupantes/${id}/`),
+  create: (data) => axiosInstance.post('/ocupantes/', data),
+  update: (id, data) => axiosInstance.patch(`/ocupantes/${id}/`, data),
+  delete: (id) => axiosInstance.delete(`/ocupantes/${id}/`),
 };
 
-// Servicios para Vehículos
 export const vehiculoService = {
-  list: (params) => axiosInstance.get('/housing/vehiculos/', { params }),
-  get: (id) => axiosInstance.get(`/housing/vehiculos/${id}/`),
-  create: (data) => axiosInstance.post('/housing/vehiculos/', data),
-  update: (id, data) => axiosInstance.patch(`/housing/vehiculos/${id}/`, data),
-  delete: (id) => axiosInstance.delete(`/housing/vehiculos/${id}/`),
+  list: (params) => axiosInstance.get('/vehiculos/', { params }),
+  get: (id) => axiosInstance.get(`/vehiculos/${id}/`),
+  create: (data) => axiosInstance.post('/vehiculos/', data),
+  update: (id, data) => axiosInstance.patch(`/vehiculos/${id}/`, data),
+  delete: (id) => axiosInstance.delete(`/vehiculos/${id}/`),
 };
 
-// Servicios para Mascotas
 export const mascotaService = {
-  list: (params) => axiosInstance.get('/housing/mascotas/', { params }),
-  get: (id) => axiosInstance.get(`/housing/mascotas/${id}/`),
-  create: (data) => axiosInstance.post('/housing/mascotas/', data),
-  update: (id, data) => axiosInstance.patch(`/housing/mascotas/${id}/`, data),
-  delete: (id) => axiosInstance.delete(`/housing/mascotas/${id}/`),
+  list: (params) => axiosInstance.get('/mascotas/', { params }),
+  get: (id) => axiosInstance.get(`/mascotas/${id}/`),
+  create: (data) => axiosInstance.post('/mascotas/', data),
+  update: (id, data) => axiosInstance.patch(`/mascotas/${id}/`, data),
+  delete: (id) => axiosInstance.delete(`/mascotas/${id}/`),
 };
 
-// Servicios para Contratos
 export const contratoService = {
-  list: (params) => axiosInstance.get('/housing/contratos/', { params }),
-  get: (id) => axiosInstance.get(`/housing/contratos/${id}/`),
-  create: (data) => axiosInstance.post('/housing/contratos/', data),
-  update: (id, data) => axiosInstance.patch(`/housing/contratos/${id}/`, data),
-  delete: (id) => axiosInstance.delete(`/housing/contratos/${id}/`),
+  list: (params) => axiosInstance.get('/contratos/', { params }),
+  get: (id) => axiosInstance.get(`/contratos/${id}/`),
+  create: (data) => axiosInstance.post('/contratos/', data),
+  update: (id, data) => axiosInstance.patch(`/contratos/${id}/`, data),
+  delete: (id) => axiosInstance.delete(`/contratos/${id}/`),
   generarCargo: (id, periodo) =>
-    axiosInstance.post(`/housing/contratos/${id}/generar_cargo/`, { periodo }),
+    axiosInstance.post(`/contratos/${id}/generar_cargo/`, { periodo }),
 };
 
 export default axiosInstance;

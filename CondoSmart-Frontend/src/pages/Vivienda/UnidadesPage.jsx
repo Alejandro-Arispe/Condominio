@@ -150,7 +150,7 @@ const UnidadesPage = () => {
       label: 'Propietario',
       render: (value) => (
         <span className="text-sm">
-          {typeof value === 'object' ? value.first_name : value || 'Sin asignar'}
+          {value && typeof value === 'object' ? `${value.first_name} ${value.last_name}` : value || 'Sin asignar'}
         </span>
       ),
     },

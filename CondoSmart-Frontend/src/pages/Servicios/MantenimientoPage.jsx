@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiTool, FiCheck } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiPlus, FiEdit2, FiTrash2, FiCheck } from 'react-icons/fi';
 import PageHeader from '../../components/common/PageHeader';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -7,41 +7,46 @@ import Modal from '../../components/common/Modal';
 import FormGroup from '../../components/common/FormGroup';
 import Alert from '../../components/common/Alert';
 import Select from '../../components/common/Select';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:8000/api/v1';
+
+const axiosInstance = axios.create({
+  baseURL: API_URL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 const MantenimientoPage = () => {
-  const [solicitudes, setSolicitudes] = useState([
-    {
-      id: 1,
-      titulo: 'Reparación de llave',
-      descripcion: 'La llave del baño pierde agua',
-      unidad: '201',
-      residente: 'Ana García',
-      estado: 'pendiente',
-      prioridad: 'media',
-      fecha_creacion: '2025-12-14',
-      categoria: 'plomeria',
-    },
-  ]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    titulo: '',
+    tipo: 'reparacion',
     descripcion: '',
-    unidad: '',
-    residente: '',
-    categoria: 'general',
+    unidad_id: '',
     prioridad: 'media',
   });
 
-  const categoriaOptions = [
-    { value: 'plomeria', label: 'Plomería' },
-    { value: 'electricidad', label: 'Electricidad' },
-    { value: 'pintura', label: 'Pintura' },
-    { value: 'carpinteria', label: 'Carpintería' },
-    { value: 'general', label: 'General' },
+  const tipoOptions = [
+    { value: 'mantenimiento', label: 'Mantenimiento' },
+    { value: 'limpieza', label: 'Limpieza' },
+    { value: 'reparacion', label: 'Reparación' },
+    { value: 'plagas', label: 'Control de Plagas' },
+    { value: 'jardineria', label: 'Jardinería' },
   ];
 
   const prioridadOptions = [
@@ -51,31 +56,37 @@ const MantenimientoPage = () => {
     { value: 'urgente', label: 'Urgente' },
   ];
 
-  const estadoOptions = [
-    { value: 'pendiente', label: 'Pendiente' },
-    { value: 'en_progreso', label: 'En Progreso' },
-    { value: 'completada', label: 'Completada' },
-  ];
+  useEffect(() => {
+    loadSolicitudes();
+  }, []);
+
+  const loadSolicitudes = async () => {
+    try {
+      setLoading(true);
+      const response = await axiosInstance.get('/tickets/');
+      setSolicitudes(response.data.results || response.data);
+    } catch (err) {
+      setError('Error al cargar solicitudes');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (solicitud = null) => {
     if (solicitud) {
       setEditingId(solicitud.id);
       setFormData({
-        titulo: solicitud.titulo,
+        tipo: solicitud.tipo,
         descripcion: solicitud.descripcion,
-        unidad: solicitud.unidad,
-        residente: solicitud.residente,
-        categoria: solicitud.categoria,
+        unidad_id: solicitud.unidad,
         prioridad: solicitud.prioridad,
       });
     } else {
       setEditingId(null);
       setFormData({
-        titulo: '',
+        tipo: 'reparacion',
         descripcion: '',
-        unidad: '',
-        residente: '',
-        categoria: 'general',
+        unidad_id: '',
         prioridad: 'media',
       });
     }
@@ -100,46 +111,40 @@ const MantenimientoPage = () => {
     try {
       setLoading(true);
       if (editingId) {
-        setSolicitudes(
-          solicitudes.map((s) =>
-            s.id === editingId
-              ? { ...s, ...formData, estado: 'en_progreso' }
-              : s
-          )
-        );
+        await axiosInstance.patch(`/tickets/${editingId}/`, formData);
         setSuccess('Solicitud actualizada correctamente');
       } else {
-        const newSolicitud = {
-          id: Math.max(...solicitudes.map((s) => s.id), 0) + 1,
-          ...formData,
-          estado: 'pendiente',
-          fecha_creacion: new Date().toISOString().split('T')[0],
-        };
-        setSolicitudes([...solicitudes, newSolicitud]);
-        setSuccess('Solicitud de mantenimiento creada correctamente');
+        await axiosInstance.post('/tickets/', formData);
+        setSuccess('Solicitud creada correctamente');
       }
       handleCloseModal();
+      loadSolicitudes();
     } catch (err) {
-      setError('Error al guardar solicitud: ' + err.message);
+      setError('Error al guardar solicitud');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('¿Estás seguro?')) {
-      setSolicitudes(solicitudes.filter((s) => s.id !== id));
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Estás seguro?')) return;
+    try {
+      await axiosInstance.delete(`/tickets/${id}/`);
       setSuccess('Solicitud eliminada correctamente');
+      loadSolicitudes();
+    } catch (err) {
+      setError('Error al eliminar solicitud');
     }
   };
 
-  const handleComplete = (id) => {
-    setSolicitudes(
-      solicitudes.map((s) =>
-        s.id === id ? { ...s, estado: 'completada' } : s
-      )
-    );
-    setSuccess('Solicitud marcada como completada');
+  const handleComplete = async (id) => {
+    try {
+      await axiosInstance.patch(`/tickets/${id}/`, { estado: 'completado' });
+      setSuccess('Solicitud marcada como completada');
+      loadSolicitudes();
+    } catch (err) {
+      setError('Error al actualizar estado');
+    }
   };
 
   const getPrioridadColor = (prioridad) => {
@@ -194,7 +199,7 @@ const MantenimientoPage = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <p className="text-gray-600 text-sm mb-2">Completadas</p>
           <p className="text-3xl font-bold text-green-600">
-            {solicitudes.filter((s) => s.estado === 'completada').length}
+            {solicitudes.filter((s) => s.estado === 'completado').length}
           </p>
         </div>
       </div>
@@ -208,13 +213,13 @@ const MantenimientoPage = () => {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Título
+                  Tipo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                  Descripción
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
                   Unidad
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                  Categoría
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
                   Prioridad
@@ -231,15 +236,13 @@ const MantenimientoPage = () => {
               {solicitudes.map((solicitud) => (
                 <tr key={solicitud.id} className="border-b hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-semibold">
-                    {solicitud.titulo}
+                    {solicitud.tipo}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {solicitud.unidad}
+                    {solicitud.descripcion?.substring(0, 50)}...
                   </td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {solicitud.categoria}
-                    </span>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {solicitud.unidad?.code || solicitud.unidad}
                   </td>
                   <td className="px-6 py-4">
                     <span
@@ -252,19 +255,18 @@ const MantenimientoPage = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                        solicitud.estado === 'completada'
+                      className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${solicitud.estado === 'completado'
                           ? 'bg-green-100 text-green-800'
                           : solicitud.estado === 'en_progreso'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
                     >
                       {solicitud.estado}
                     </span>
                   </td>
                   <td className="px-6 py-4 flex gap-2 justify-center">
-                    {solicitud.estado !== 'completada' && (
+                    {solicitud.estado !== 'completado' && (
                       <button
                         onClick={() => handleComplete(solicitud.id)}
                         className="p-1 text-green-600 hover:bg-green-50 rounded"
@@ -299,12 +301,12 @@ const MantenimientoPage = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormGroup label="Título" required>
-            <Input
-              name="titulo"
-              value={formData.titulo}
+          <FormGroup label="Tipo" required>
+            <Select
+              name="tipo"
+              value={formData.tipo}
               onChange={handleInputChange}
-              placeholder="Descripción breve"
+              options={tipoOptions}
             />
           </FormGroup>
 
@@ -319,30 +321,13 @@ const MantenimientoPage = () => {
             />
           </FormGroup>
 
-          <FormGroup label="Unidad" required>
+          <FormGroup label="ID de Unidad" required>
             <Input
-              name="unidad"
-              value={formData.unidad}
+              name="unidad_id"
+              type="number"
+              value={formData.unidad_id}
               onChange={handleInputChange}
-              placeholder="Número de unidad"
-            />
-          </FormGroup>
-
-          <FormGroup label="Residente" required>
-            <Input
-              name="residente"
-              value={formData.residente}
-              onChange={handleInputChange}
-              placeholder="Nombre del residente"
-            />
-          </FormGroup>
-
-          <FormGroup label="Categoría" required>
-            <Select
-              name="categoria"
-              value={formData.categoria}
-              onChange={handleInputChange}
-              options={categoriaOptions}
+              placeholder="ID de la unidad"
             />
           </FormGroup>
 

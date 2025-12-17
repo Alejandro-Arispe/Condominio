@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(`${API_URL}/token/`, {
+      const response = await axios.post(`${API_URL}/auth/login/`, {
         username: email,
         password,
       });
@@ -31,8 +31,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('refresh_token', refresh);
       axios.defaults.headers.common['Authorization'] = `Bearer ${access}`;
 
-      // Obtener datos del usuario
-      const userResponse = await axios.get(`${API_URL}/me/`);
+      const userResponse = await axios.get(`${API_URL}/usuarios/me/`);
       setUser(userResponse.data);
 
       return { success: true };
